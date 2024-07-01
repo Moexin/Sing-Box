@@ -1,0 +1,47 @@
+name: Update
+
+on:
+  push:
+  schedule:
+    - cron: 0 16 * * *
+
+env:
+  TZ: Asia/Shanghai
+
+jobs:
+  Update:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: GetTime
+      id: date
+      run: echo "::set-output name=date::$(date +'%Y-%m-%d %H:%M:%S CST')"
+
+    - name: Update
+      run: |
+        rm -f sing-box
+        SING_BOX_LATEST=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest \
+            | grep tag_name \
+            | cut -d ":" -f2 \
+            | sed 's/\"//g;s/\,//g;s/\ //g;s/v//')
+        curl -LOf# https://github.com/SagerNet/sing-box/releases/download/v${SING_BOX_LATEST}/sing-box-${SING_BOX_LATEST}-linux-amd64v3.tar.gz
+        tar -zxvf sing-box-${SING_BOX_LATEST}-linux-amd64v3.tar.gz sing-box-${SING_BOX_LATEST}-linux-amd64v3/sing-box
+        rm -f sing-box-${SING_BOX_LATEST}-linux-amd64v3.tar.gz
+        mv sing-box-${SING_BOX_LATEST}-linux-amd64v3/sing-box sing-box
+        rm -rf sing-box-${SING_BOX_LATEST}-linux-amd64v3
+        echo "Auto Update Sing-Box(${SING_BOX_LATEST}) in ${{ steps.date.outputs.date }}" > README.md
+
+    - name: Clean
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git checkout --orphan latest_branch
+        git add -A
+        git commit -am "${{ steps.date.outputs.date }}"
+        git branch -D Files
+        git branch -m Files
+
+    - name: Push
+      run: git push -f origin Files
